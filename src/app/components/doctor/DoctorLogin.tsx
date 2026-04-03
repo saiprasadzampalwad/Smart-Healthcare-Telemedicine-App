@@ -59,6 +59,18 @@ export default function DoctorLogin() {
                 Login
               </Button>
             </form>
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => navigate('/doctor/register')}
+                  className="text-green-600 hover:underline font-medium"
+                >
+                  Sign up here
+                </button>
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

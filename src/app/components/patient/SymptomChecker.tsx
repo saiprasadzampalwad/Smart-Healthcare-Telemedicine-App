@@ -14,6 +14,8 @@ export default function SymptomChecker() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
 
   const commonSymptoms = [
     { id: 'fever', name: 'Fever', severity: 'medium' },
@@ -36,8 +38,30 @@ export default function SymptomChecker() {
     );
   };
 
-  const analyzeSymptoms = () => {
+  const analyzeSymptoms = async () => {
     setShowResults(true);
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+
+    const symptomNames = selectedSymptoms.map(id => commonSymptoms.find(s => s.id === id)?.name).filter(Boolean);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/ai/symptoms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symptoms: symptomNames.join(', ') })
+      });
+      if (!response.ok) {
+        throw new Error('Could not fetch AI analysis');
+      }
+      const data = await response.json();
+      setAiAnalysis(data.analysis || 'Analysis could not be generated.');
+    } catch (error) {
+      console.error(error);
+      setAiAnalysis('An error occurred connecting to the Gemini AI server. Please make sure GEMINI_API_KEY is configured correctly.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const getSeverityLevel = () => {
@@ -46,42 +70,6 @@ export default function SymptomChecker() {
       return symptom?.severity === 'high';
     });
     return hasHighSeverity ? 'high' : selectedSymptoms.length > 3 ? 'medium' : 'low';
-  };
-
-  const getRecommendation = () => {
-    const severity = getSeverityLevel();
-    
-    if (severity === 'high') {
-      return {
-        title: 'Immediate Medical Attention Recommended',
-        description: 'Based on your symptoms, we recommend visiting a hospital immediately or calling emergency services.',
-        action: 'Find Nearby Hospital',
-        actionPath: '/patient/doctors',
-        icon: AlertCircle,
-        color: 'red',
-        specialists: ['Emergency Medicine', 'Cardiologist']
-      };
-    } else if (severity === 'medium') {
-      return {
-        title: 'Consult a Doctor Soon',
-        description: 'Your symptoms suggest you should see a doctor within 24-48 hours.',
-        action: 'Book Appointment',
-        actionPath: '/patient/doctors',
-        icon: Info,
-        color: 'orange',
-        specialists: ['General Physician', 'Internal Medicine']
-      };
-    } else {
-      return {
-        title: 'Online Consultation Recommended',
-        description: 'Your symptoms are mild. An online consultation would be sufficient.',
-        action: 'Start Video Consultation',
-        actionPath: '/patient/doctors',
-        icon: CheckCircle2,
-        color: 'green',
-        specialists: ['General Physician', 'Family Medicine']
-      };
-    }
   };
 
   const filteredSymptoms = commonSymptoms.filter(symptom =>
@@ -115,7 +103,7 @@ export default function SymptomChecker() {
           <Info className="w-4 h-4 text-blue-600" />
           <AlertTitle className="text-blue-900">AI-Powered Analysis</AlertTitle>
           <AlertDescription className="text-blue-700">
-            This is a preliminary assessment tool. It does not replace professional medical diagnosis.
+            Powered by Google Gemini. This is a preliminary assessment tool. It does not replace professional medical diagnosis.
           </AlertDescription>
         </Alert>
 
@@ -133,7 +121,7 @@ export default function SymptomChecker() {
                   placeholder="Type to search symptoms..."
                   className="pl-10 h-12"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
@@ -203,80 +191,51 @@ export default function SymptomChecker() {
             {/* Results */}
             <Card className="mb-6">
               <CardHeader>
-                <CardTitle>Analysis Results</CardTitle>
+                <CardTitle>Gemini Analysis Results</CardTitle>
                 <CardDescription>
                   Based on {selectedSymptoms.length} symptom{selectedSymptoms.length > 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {(() => {
-                    const recommendation = getRecommendation();
-                    const Icon = recommendation.icon;
-                    const severity = getSeverityLevel();
-                    
-                    return (
-                      <>
-                        <Alert className={`${
-                          severity === 'high' ? 'bg-red-50 border-red-200' :
-                          severity === 'medium' ? 'bg-orange-50 border-orange-200' :
-                          'bg-green-50 border-green-200'
-                        }`}>
-                          <Icon className={`w-5 h-5 ${
-                            severity === 'high' ? 'text-red-600' :
-                            severity === 'medium' ? 'text-orange-600' :
-                            'text-green-600'
-                          }`} />
-                          <AlertTitle className={`${
-                            severity === 'high' ? 'text-red-900' :
-                            severity === 'medium' ? 'text-orange-900' :
-                            'text-green-900'
-                          }`}>
-                            {recommendation.title}
-                          </AlertTitle>
-                          <AlertDescription className={`${
-                            severity === 'high' ? 'text-red-700' :
-                            severity === 'medium' ? 'text-orange-700' :
-                            'text-green-700'
-                          }`}>
-                            {recommendation.description}
-                          </AlertDescription>
-                        </Alert>
-
-                        <div>
-                          <h4 className="font-semibold mb-3">Recommended Specialists:</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {recommendation.specialists.map((specialist) => (
-                              <Badge key={specialist} className="bg-blue-100 text-blue-700">
-                                {specialist}
-                              </Badge>
-                            ))}
-                          </div>
+                   {isAnalyzing ? (
+                      <div className="flex flex-col items-center py-10 justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-gray-600">Gemini is analyzing your symptoms...</p>
+                      </div>
+                   ) : (
+                     <>
+                        <div className="bg-slate-50 p-6 rounded-lg border">
+                           {aiAnalysis ? (
+                              <div className="whitespace-pre-wrap text-slate-800 leading-relaxed text-sm">
+                                 {aiAnalysis}
+                              </div>
+                           ) : (
+                              <div className="text-red-500">Could not retrieve AI analysis.</div>
+                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                           <Button
-                            onClick={() => navigate(recommendation.actionPath)}
-                            className={`h-12 ${
-                              severity === 'high' ? 'bg-red-600 hover:bg-red-700' :
-                              severity === 'medium' ? 'bg-orange-600 hover:bg-orange-700' :
-                              'bg-green-600 hover:bg-green-700'
-                            }`}
+                            onClick={() => navigate('/patient/appointment')}
+                            className="h-12 bg-blue-600 hover:bg-blue-700"
                           >
-                            {severity === 'high' ? <Building2 className="w-4 h-4 mr-2" /> : <Video className="w-4 h-4 mr-2" />}
-                            {recommendation.action}
+                            <Building2 className="w-4 h-4 mr-2" />
+                            Book Appointment
                           </Button>
                           <Button
-                            onClick={() => setShowResults(false)}
+                            onClick={() => {
+                               setShowResults(false);
+                               setAiAnalysis(null);
+                            }}
                             variant="outline"
                             className="h-12"
                           >
                             Check Again
                           </Button>
                         </div>
-                      </>
-                    );
-                  })()}
+                     </>
+                   )}
                 </div>
               </CardContent>
             </Card>

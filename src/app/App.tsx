@@ -20,6 +20,10 @@ import BedAvailability from '@/app/components/hospital/BedAvailability';
 import PaymentScreen from '@/app/components/payment/PaymentScreen';
 import AdminDashboard from '@/app/components/admin/AdminDashboard';
 import AdminLogin from '@/app/components/admin/AdminLogin';
+import AdminRegistration from '@/app/components/admin/AdminRegistration';
+import DoctorRegistration from '@/app/components/doctor/DoctorRegistration';
+import HospitalRegistration from '@/app/components/hospital/HospitalRegistration';
+import Chatbot from '@/app/components/Chatbot';
 
 function App() {
   return (
@@ -40,12 +44,14 @@ function App() {
           <Route path="/patient/notifications" element={<Notifications />} />
           
           {/* Doctor Routes */}
+          <Route path="/doctor/register" element={<DoctorRegistration />} />
           <Route path="/doctor/login" element={<DoctorLogin />} />
           <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
           <Route path="/doctor/schedule" element={<DoctorSchedule />} />
           <Route path="/doctor/appointments" element={<PatientAppointments />} />
           
           {/* Hospital Routes */}
+          <Route path="/hospital/register" element={<HospitalRegistration />} />
           <Route path="/hospital/login" element={<HospitalLogin />} />
           <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
           <Route path="/hospital/beds" element={<BedAvailability />} />
@@ -57,9 +63,11 @@ function App() {
           <Route path="/payment" element={<PaymentScreen />} />
           
           {/* Admin Routes */}
+          <Route path="/admin/register" element={<AdminRegistration />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Routes>
+        <Chatbot />
       </div>
     </Router>
   );

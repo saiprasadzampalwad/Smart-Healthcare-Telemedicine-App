@@ -1,7 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
 require('dotenv').config();
+
+// Connect DB
+const db = require('./src/config/db');
+
+// Route files
+const authRoutes = require('./src/routes/authRoutes');
+const doctorRoutes = require('./src/routes/doctorRoutes');
+const appointmentRoutes = require('./src/routes/appointmentRoutes');
+const prescriptionRoutes = require('./src/routes/prescriptionRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,17 +20,19 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Database Connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-
 // Test DB Connection
-pool.connect()
+db.pool.connect()
   .then(() => console.log('Connected to PostgreSQL successfully'))
   .catch(err => console.error('Connection error', err.stack));
 
-// Routes
+// Mount Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/doctors', doctorRoutes);
+app.use('/api/appointments', appointmentRoutes);
+app.use('/api/prescriptions', prescriptionRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });
 });
