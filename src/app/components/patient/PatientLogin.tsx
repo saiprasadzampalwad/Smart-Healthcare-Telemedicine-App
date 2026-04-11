@@ -1,27 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Phone, Lock } from 'lucide-react';
+import { ArrowLeft, Heart, Mail, Lock, Phone, AlertCircle } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 
 export default function PatientLogin() {
   const navigate = useNavigate();
-  const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendOTP = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending OTP
-    setOtpSent(true);
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Navigate to dashboard
-    navigate('/patient/dashboard');
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid credentials');
+      }
+      
+      localStorage.setItem('token', data.token);
+      navigate('/patient/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -51,69 +67,49 @@ export default function PatientLogin() {
             <CardDescription>Login to access your health records</CardDescription>
           </CardHeader>
           <CardContent>
-            {!otpSent ? (
-              <form onSubmit={handleSendOTP} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="mobile">Mobile Number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                    <Input
-                      id="mobile"
-                      placeholder="+91 XXXXX XXXXX"
-                      maxLength={10}
-                      className="pl-10"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 h-12">
-                  Send OTP
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Enter OTP</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                    <Input
-                      id="otp"
-                      placeholder="6-digit OTP"
-                      maxLength={6}
-                      className="pl-10"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    OTP sent to {mobile}.{' '}
-                    <button
-                      type="button"
-                      onClick={() => setOtpSent(false)}
-                      className="text-blue-600 hover:underline"
-                    >
-                      Change number
-                    </button>
-                  </p>
-                </div>
-
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 h-12">
-                  Verify & Login
-                </Button>
-
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="w-full text-blue-600 hover:underline text-sm"
-                >
-                  Resend OTP
-                </button>
-              </form>
+            {error && (
+               <Alert className="mb-4 bg-red-50 text-red-700 border-red-200">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <AlertDescription>{error}</AlertDescription>
+               </Alert>
             )}
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="patient@example.com"
+                    className="pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 h-12">
+                {isLoading ? 'Logging in...' : 'Login Securely'}
+              </Button>
+            </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">

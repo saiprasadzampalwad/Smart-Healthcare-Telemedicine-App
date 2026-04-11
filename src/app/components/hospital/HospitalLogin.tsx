@@ -1,17 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Building2, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, Heart, Building2, Mail, Lock, AlertCircle } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 
 export default function HospitalLogin() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/hospital/dashboard');
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid credentials');
+      }
+      
+      localStorage.setItem('token', data.token);
+      navigate('/hospital/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,23 +66,45 @@ export default function HospitalLogin() {
             <CardDescription>Login to manage hospital operations</CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+               <Alert className="mb-4 bg-red-50 text-red-700 border-red-200">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  <AlertDescription>{error}</AlertDescription>
+               </Alert>
+            )}
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email">Hospital ID</Label>
+                <Label htmlFor="email">Hospital ID / Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input id="email" placeholder="hospital@example.com" className="pl-10" required />
+                  <Input 
+                    id="email" 
+                    type="email"
+                    placeholder="hospital@example.com" 
+                    className="pl-10" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required 
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <Input id="password" type="password" placeholder="••••••••" className="pl-10" required />
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder="••••••••" 
+                    className="pl-10" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required 
+                  />
                 </div>
               </div>
-              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 h-12">
-                Login
+              <Button type="submit" disabled={isLoading} className="w-full bg-purple-600 hover:bg-purple-700 h-12">
+                {isLoading ? 'Logging in...' : 'Login'}
               </Button>
             </form>
             <div className="mt-4 text-center">

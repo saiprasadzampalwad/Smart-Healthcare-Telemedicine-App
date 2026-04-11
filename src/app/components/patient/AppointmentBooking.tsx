@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Calendar, Clock, MapPin, Video, CheckCircle2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Heart, Calendar, Clock, MapPin, Video, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
@@ -9,10 +9,14 @@ import { Badge } from '@/app/components/ui/badge';
 
 export default function AppointmentBooking() {
   const navigate = useNavigate();
+  const { doctorId } = useParams();
   const [consultationType, setConsultationType] = useState('online');
   const [selectedDate, setSelectedDate] = useState('2026-01-26');
   const [selectedTime, setSelectedTime] = useState('10:00 AM');
   const [booked, setBooked] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const [error, setError] = useState('');
+  const [doctorInfo, setDoctorInfo] = useState<any>(null);
 
   const availableDates = [
     '2026-01-26',
@@ -27,8 +31,71 @@ export default function AppointmentBooking() {
     '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM'
   ];
 
-  const handleBooking = () => {
-    setBooked(true);
+  React.useEffect(() => {
+    if (!doctorId) {
+      navigate('/patient/doctors');
+      return;
+    }
+    const fetchDoctor = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/doctors/${doctorId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDoctorInfo(data);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchDoctor();
+  }, [doctorId, navigate]);
+
+  const handleBooking = async () => {
+    setIsBooking(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return navigate('/patient/login');
+
+      // Convert "10:00 AM" to "10:00:00" for postgres TIME type compatibility
+      const formatTime = (timeStr: string) => {
+        const [time, modifier] = timeStr.trim().split(' ');
+        let [hours, minutes] = time.split(':');
+        if (hours === '12') {
+          hours = '00';
+        }
+        if (modifier === 'PM') {
+          hours = parseInt(hours, 10) + 12 + '';
+        }
+        return `${hours.padStart(2, '0')}:${minutes}:00`;
+      };
+
+      const bodyData = {
+        doctor_id: doctorId,
+        appointment_date: selectedDate,
+        time_slot: formatTime(selectedTime),
+        type: consultationType === 'online' ? 'video_consultation' : 'in_person',
+        notes: 'General Checkup'
+      };
+
+      const res = await fetch('http://localhost:5000/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(bodyData)
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error booking appointment');
+      
+      setBooked(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   if (booked) {
@@ -61,8 +128,8 @@ export default function AppointmentBooking() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600">Doctor</p>
-                    <p className="font-semibold text-gray-900">Dr. Priya Sharma</p>
-                    <p className="text-sm text-blue-600">Cardiologist</p>
+                    <p className="font-semibold text-gray-900">{doctorInfo ? doctorInfo.name : 'Loading...'}</p>
+                    <p className="text-sm text-blue-600">{doctorInfo ? doctorInfo.specialization : 'Specialist'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-600" />
@@ -116,12 +183,12 @@ export default function AppointmentBooking() {
           <CardContent className="p-6">
             <div className="flex gap-4">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-blue-600">P</span>
+                <span className="text-2xl font-bold text-blue-600">{doctorInfo?.name ? doctorInfo.name[0].toUpperCase() : 'D'}</span>
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Dr. Priya Sharma</h3>
-                <p className="text-blue-600">Cardiologist</p>
-                <p className="text-sm text-gray-600">AIIMS Delhi • 15 years exp.</p>
+                <h3 className="font-semibold text-lg">{doctorInfo ? doctorInfo.name : 'Loading...'}</h3>
+                <p className="text-blue-600">{doctorInfo ? doctorInfo.specialization : 'Specialist'}</p>
+                <p className="text-sm text-gray-600">Smart Healthcare Network {doctorInfo?.experience_years ? `• ${doctorInfo.experience_years} years exp.` : ''}</p>
               </div>
             </div>
           </CardContent>
@@ -233,11 +300,18 @@ export default function AppointmentBooking() {
         </Card>
 
         {/* Book Button */}
+        {error && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 mb-4">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p>{error}</p>
+            </div>
+        )}
         <Button
           onClick={handleBooking}
+          disabled={isBooking}
           className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg"
         >
-          Confirm Booking - ₹500
+          {isBooking ? 'Booking...' : 'Confirm Booking - ₹500'}
         </Button>
       </div>
     </div>

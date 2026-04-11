@@ -12,6 +12,8 @@ const appointmentRoutes = require('./src/routes/appointmentRoutes');
 const prescriptionRoutes = require('./src/routes/prescriptionRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const aiRoutes = require('./src/routes/aiRoutes');
+const hospitalRoutes = require('./src/routes/hospitalRoutes');
+const recordRoutes = require('./src/routes/recordRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +34,8 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/records', recordRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });

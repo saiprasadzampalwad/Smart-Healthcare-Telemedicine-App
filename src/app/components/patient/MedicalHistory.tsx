@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Calendar, FileText, Download, Clock } from 'lucide-react';
+import { ArrowLeft, Heart, Calendar, FileText, Download, Clock, MapPin, Video } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
@@ -8,16 +8,41 @@ import { Badge } from '@/app/components/ui/badge';
 
 export default function MedicalHistory() {
   const navigate = useNavigate();
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const appointments = [
-    { id: 1, date: '2026-01-15', doctor: 'Dr. Priya Sharma', type: 'Cardiologist', status: 'completed' },
-    { id: 2, date: '2025-12-20', doctor: 'Dr. Rajesh Kumar', type: 'General Physician', status: 'completed' }
-  ];
-
+  // Still mocking prescriptions as backend `/api/prescriptions` is not fully wired yet
   const prescriptions = [
     { id: 1, date: '2026-01-15', doctor: 'Dr. Priya Sharma', medicines: 3 },
     { id: 2, date: '2025-12-20', doctor: 'Dr. Rajesh Kumar', medicines: 2 }
   ];
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/patient/login');
+          return;
+        }
+
+        const res = await fetch('http://localhost:5000/api/appointments', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const apptData = await res.json();
+          setAppointments(apptData);
+        }
+      } catch (err) {
+        console.error('Error fetching appointments:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -43,23 +68,46 @@ export default function MedicalHistory() {
           </TabsList>
 
           <TabsContent value="appointments" className="space-y-4">
-            {appointments.map((apt) => (
-              <Card key={apt.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg mb-1">{apt.doctor}</h3>
-                      <p className="text-blue-600 mb-2">{apt.type}</p>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(apt.date).toLocaleDateString()}</span>
+            {isLoading ? (
+               <p className="text-center text-gray-500 py-6">Loading real-time records...</p>
+            ) : appointments.length === 0 ? (
+               <p className="text-center text-gray-500 py-6">No appointments found.</p>
+            ) : (
+                appointments.map((apt) => (
+                  <Card key={apt.id}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">{apt.doctor_name || 'Doctor'}</h3>
+                          <p className="text-blue-600 mb-2">{apt.specialization || 'Specialist'}</p>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(apt.appointment_date).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              <span>{apt.time_slot}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 items-end">
+                           <Badge variant="outline" className={apt.type === 'video_consultation' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}>
+                             {apt.type === 'video_consultation' ? 'Video' : 'In-Person'}
+                           </Badge>
+                           <Badge className={
+                             apt.status === 'scheduled' ? 'bg-blue-100 text-blue-700' : 
+                             apt.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                             'bg-red-100 text-red-700'
+                           }>
+                             {apt.status === 'scheduled' ? 'Scheduled' : apt.status === 'completed' ? 'Completed' : 'Cancelled'}
+                           </Badge>
+                        </div>
                       </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-700">Completed</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </CardContent>
+                  </Card>
+                ))
+            )}
           </TabsContent>
 
           <TabsContent value="prescriptions" className="space-y-4">
