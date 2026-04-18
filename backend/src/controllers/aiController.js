@@ -1,77 +1,89 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const checkSymptoms = async (req, res) => {
-  const { symptoms } = req.body;
-  if (!symptoms) {
-    return res.status(400).json({ message: 'Please provide symptoms' });
-  }
+let genAI = null;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_api_key_here') {
-     return res.status(500).json({ message: 'GEMINI_API_KEY is not strictly configured on the server.' });
-  }
-
+if (process.env.GEMINI_API_KEY) {
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const prompt = `
-      You are an AI Symptom Checker for a telemedicine app.
-      A user reports the following symptoms: "${symptoms}".
-      Provide a brief strictly medical analysis:
-      1. Potential common causes.
-      2. When to see a doctor immediately (Red flags).
-      3. At-home care tips.
-      DISCLAIMER: Always start your response by stating "I am an AI, not a doctor. This does not replace professional medical advice."
-    `;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    res.json({ analysis: text });
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   } catch (error) {
-    console.error('Error in checkSymptoms:', error);
-    res.status(500).json({ message: 'Failed to process symptoms through AI.' });
+    console.error('Gemini AI init failed:', error);
+  }
+}
+
+// Check symptoms analysis
+const checkSymptoms = async (req, res) => {
+  try {
+    const { symptoms } = req.body;
+
+    if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
+      return res.status(400).json({ error: 'Symptoms array required' });
+    }
+
+    if (genAI) {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const prompt = `Analyze these symptoms and provide possible conditions (NOT diagnosis): ${symptoms.join(', ')}. Respond in JSON: {\\"possible_conditions\\": [\\"list\\"], \\"recommendation\\": \\"text\\", \\"urgency\\": \\"low/medium/high\\"}`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const analysis = JSON.parse(response.text());
+      
+      res.json({
+        success: true,
+        data: analysis,
+        source: 'gemini'
+      });
+    } else {
+      // Fallback mock response
+      res.json({
+        success: true,
+        data: {
+          possible_conditions: ['Common cold', 'Allergies', 'Need doctor consultation'],
+          recommendation: 'Monitor symptoms. Book appointment if persists >3 days.',
+          urgency: 'low'
+        },
+        source: 'fallback',
+        note: 'Add GEMINI_API_KEY to .env for full AI'
+      });
+    }
+  } catch (error) {
+    console.error('AI error:', error);
+    res.status(500).json({ error: 'AI service unavailable' });
   }
 };
 
+// Chatbot conversation
 const chatBot = async (req, res) => {
-  const { expectedHistory, message } = req.body;
-  if (!message) {
-    return res.status(400).json({ message: 'Please send a message' });
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === 'your_api_key_here') {
-     return res.status(500).json({ message: 'GEMINI_API_KEY is not strictly configured on the server.' });
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
-        systemInstruction: "You are a helpful virtual assistant for Smart Healthcare Telemedicine App. You help users navigate the app, understand telemedicine, and answer basic health queries safely. Remind users you are an AI if asked for strict diagnoses."
-     });
-    
-    // map history format properly if needed, omitting for simple call or handle basic map
-    const formattedHistory = (expectedHistory || []).map(h => ({
-        role: h.role === 'model' ? 'model' : 'user',
-        parts: [{ text: h.text }]
-    }));
+    const { message, history = [], expectedHistory = [] } = req.body;
+    const chatHistory = history.length ? history : expectedHistory;
 
-    const chat = model.startChat({
-       history: formattedHistory
-    });
+    if (!message) {
+      return res.status(400).json({ error: 'Message required' });
+    }
 
-    const result = await chat.sendMessage(message);
-    const response = await result.response;
-    const text = response.text();
-
-    res.json({ reply: text });
+    if (genAI) {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const context = chatHistory.map(h => `${h.role}: ${h.text || h.content || ''}`).join('\\n');
+      const prompt = `Medical chatbot context:\\n${context}\\nUser: ${message}\\nBot (helpful, accurate, non-diagnostic):`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      
+      res.json({
+        success: true,
+        reply: response.text().trim(),
+        source: 'gemini'
+      });
+    } else {
+      res.json({
+        success: true,
+        reply: 'AI Chatbot ready! Add GEMINI_API_KEY to .env for full responses. Try booking an appointment.',
+        source: 'fallback'
+      });
+    }
   } catch (error) {
-     console.error('Error in chatBot:', error);
-     res.status(500).json({ message: 'AI Chat failed.' });
+    console.error('Chatbot error:', error);
+    res.status(500).json({ error: 'Chat service unavailable' });
   }
 };
 
